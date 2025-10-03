@@ -132,10 +132,11 @@ export const templateAPI = {
   getTemplates: () => api.get('/templates'),
   getTemplate: (id) => api.get(`/templates/${id}`),
   getTemplateCategories: () => api.get('/templates/categories'),
-  getTemplatesByCategory: (category) => api.get(`/templates/category/${category}`),
-  getFeaturedTemplates: () => api.get('/templates/featured'),
+  getTemplatesByCategory: (category) => api.get(`/templates?category=${encodeURIComponent(category)}`),
+  getFeaturedTemplates: () => api.get('/templates'),
   useTemplate: (templateId) => api.post(`/templates/${templateId}/use`)
 };
+
 
 // Helper function to convert data URL to Blob
 function dataURLtoBlob(dataURL) {

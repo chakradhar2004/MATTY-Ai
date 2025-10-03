@@ -52,7 +52,7 @@ mongoose
 app.use('/api/auth', authRoutes);
 app.use('/api/designs', designRoutes);
 app.use('/api/upload', uploadRoutes);
-app.use('/api/templates', require('./routes/templates'));
+app.use('/api/templates', require('./routes/templateRoutes'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Health check endpoint
