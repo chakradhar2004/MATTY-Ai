@@ -1,0 +1,207 @@
+/* stylelint-disable */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import available web fonts. 'Joan' is kept as a local/system fallback name */
+@import url('https://fonts.googleapis.com/css2?family=Galdeano&display=swap');
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: 'Joan', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  }
+}
+
+@layer base {
+  h1 { @apply text-4xl md:text-5xl font-bold tracking-tight; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+  h2 { @apply text-3xl md:text-4xl font-semibold tracking-tight; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+  h3 { @apply text-2xl font-semibold; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+  h4 { @apply text-xl font-semibold; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+  h5 { @apply text-lg font-medium; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+  h6 { @apply text-base font-medium; font-family: 'Galdeano', ui-sans-serif, system-ui, sans-serif; }
+
+  p { @apply leading-7; }
+  small { @apply text-sm text-secondary-600; }
+
+  /* Hide text caret globally except in editable fields */
+  :where(*):not(input):not(textarea):not([contenteditable="true"]):not([contenteditable=""]) {
+    caret-color: transparent;
+  }
+  input, textarea, [contenteditable="true"], [contenteditable=""] {
+    caret-color: auto;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary-100 text-secondary-900 hover:bg-secondary-200 active:bg-secondary-300;
+  }
+  
+  .btn-outline {
+    @apply border border-secondary-300 bg-transparent hover:bg-secondary-50 active:bg-secondary-100;
+  }
+  
+  .btn-ghost {
+    @apply hover:bg-secondary-100 active:bg-secondary-200;
+  }
+  
+  .btn-sm {
+    @apply h-8 px-3 text-xs;
+  }
+  
+  .btn-md {
+    @apply h-10 px-4 py-2;
+  }
+  
+  .btn-lg {
+    @apply h-12 px-8 text-base;
+  }
+  
+  .input {
+    @apply flex h-10 w-full rounded-md border border-secondary-300 bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-secondary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  
+  .card {
+    @apply rounded-lg border border-secondary-200 bg-white shadow-sm;
+  }
+  
+  .canvas-container {
+    @apply relative bg-white border border-secondary-200 rounded-lg shadow-sm overflow-hidden;
+  }
+  
+  .toolbar {
+    @apply flex items-center gap-2 p-3 bg-white border-b border-secondary-200;
+  }
+  
+  .sidebar {
+    @apply w-64 bg-white border-r border-secondary-200 flex flex-col;
+  }
+  
+  .panel {
+    @apply bg-white border border-secondary-200 rounded-lg p-4;
+  }
+
+  /* App background gradient matching provided palette */
+  .bg-app-gradient {
+    background: radial-gradient(1200px 600px at 15% -10%, rgba(147, 197, 253, 0.8) 0%, rgba(147, 197, 253, 0) 60%),
+                radial-gradient(1200px 600px at 85% 110%, rgba(219, 234, 254, 0.9) 0%, rgba(219, 234, 254, 0) 60%),
+                linear-gradient(135deg, #0b2a7a 0%, #123a93 25%, #1e40af 50%, #3b82f6 75%, #dbeafe 100%);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Loading animation */
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Canvas selection styles */
+.konvajs-content {
+  border-radius: 8px;
+}
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+}
+
+/* Modal overlay */
+.modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+/* stylelint-enable */

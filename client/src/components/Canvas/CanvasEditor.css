@@ -1,0 +1,61 @@
+/* Canvas Editor scoped styles */
+
+.editor-root {
+  /* keeps the app bright and neutral */
+  background-color: #ffffff;
+}
+
+.canvas-container {
+  /* subtle elevation and soft border to separate from page */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 6px 10px rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+/* Toolbar tweaks */
+.editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: saturate(1.2) blur(6px);
+  backdrop-filter: saturate(1.2) blur(6px);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.editor-toolbar .btn {
+  border: 1px solid #d1d5db;
+  color: #374151;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.editor-toolbar .btn:hover {
+  background: #f3f4f6;
+}
+
+.editor-toolbar .btn.is-active {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+/* Dropdown menus */
+.editor-dropdown {
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+  border-radius: 10px;
+}
+
+/* Inputs */
+.editor-input {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+
