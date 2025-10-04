@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import './CanvasEditor.css';
 import { Stage, Layer, Text, Rect, Circle, RegularPolygon, Image as KonvaImage, Transformer, Line, Arrow, Star, Ellipse, Ring } from 'react-konva';
 import { useDispatch, useSelector } from 'react-redux';
@@ -9,6 +9,12 @@ import useImage from 'use-image';
 import { uploadAPI } from '../../services/api';
 import { setExportRequest } from '../../store/slices/canvasSlice';
 import { FaUndo, FaRedo, FaTrash, FaFont, FaSquare, FaCircle, FaCaretUp, FaImage, FaSave, FaDownload, FaArrowLeft, FaBold, FaItalic, FaFilePdf, FaSpinner, FaMinus, FaArrowRight, FaGem, FaStar, FaPalette, FaPlay, FaStop, FaHeart, FaShapes, FaChevronDown, FaEllipsisH, FaFileImage, FaDraftingCompass, FaChevronUp, FaMousePointer, FaHandPaper } from 'react-icons/fa';
+
+
+// This function is no longer used - text editing is handled by the component's internal methods
+
+
+// This function is no longer used - color changes are handled by the component's internal methods
 
 // Helper component to render images from a src URL
 const ImageNode = ({ element, commonProps }) => {
@@ -107,6 +113,9 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     if (selectedId && stageRef.current) {
       const selectedNode = stageRef.current.findOne('#' + selectedId);
       if (selectedNode && transformerRef.current) {
+        // Clear previous nodes
+        transformerRef.current.nodes([]);
+        // Add the selected node
         transformerRef.current.nodes([selectedNode]);
         transformerRef.current.getLayer().batchDraw();
       }
@@ -118,7 +127,61 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   // Keyboard shortcuts: undo/redo/delete/copy/paste/save/export
   useEffect(() => {
     const onKeyDown = (e) => {
+      // Don't handle keyboard shortcuts when editing text
+      if (isEditing) {
+        // Allow Escape to cancel editing
+        if (e.key === 'Escape') {
+          updateText();
+        }
+        return;
+      }
+
       const isCtrl = e.ctrlKey || e.metaKey;
+      
+      // Bold/Italic/Underline shortcuts when text is selected
+      if (selectedId) {
+        const selectedElement = elements.find(el => el.id === selectedId);
+        if (selectedElement?.type === 'text') {
+          if (isCtrl && e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            const newBold = !isBold;
+            setIsBold(newBold);
+            const updated = elements.map((el) => 
+              el.id === selectedId ? { ...el, fontWeight: newBold ? 'bold' : 'normal' } : el
+            );
+            setElements(updated);
+            saveToHistory(updated);
+            setIsDraft(true);
+            return;
+          }
+          if (isCtrl && e.key.toLowerCase() === 'i') {
+            e.preventDefault();
+            const newItalic = !isItalic;
+            setIsItalic(newItalic);
+            const updated = elements.map((el) => 
+              el.id === selectedId ? { ...el, fontStyle: newItalic ? 'italic' : 'normal' } : el
+            );
+            setElements(updated);
+            saveToHistory(updated);
+            setIsDraft(true);
+            return;
+          }
+          if (isCtrl && e.key.toLowerCase() === 'u') {
+            e.preventDefault();
+            const newUnderline = !isUnderline;
+            setIsUnderline(newUnderline);
+            const updated = elements.map((el) => 
+              el.id === selectedId ? { ...el, textDecoration: newUnderline ? 'underline' : '' } : el
+            );
+            setElements(updated);
+            saveToHistory(updated);
+            setIsDraft(true);
+            return;
+          }
+        }
+      }
+
+      // Global shortcuts
       if (isCtrl && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         handleUndo();
@@ -159,22 +222,28 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [elements, selectedId, clipboard, historyStep, history]);
+  }, [elements, selectedId, clipboard, historyStep, history, isEditing]);
 
   // Update property controls when selection changes
   useEffect(() => {
-    if (selectedId) {
+    if (selectedId && !isEditing) {  // Don't update styles when editing
       const selectedElement = elements.find(el => el.id === selectedId);
       if (selectedElement) {
         if (selectedElement.type === 'text') {
           setSelectedFontFamily(selectedElement.fontFamily || 'Arial');
-          setSelectedFontSize(selectedElement.fontSize || 20);
+          setSelectedFontSize(selectedElement.fontSize || selectedFontSize);
           setIsBold(selectedElement.fontWeight === 'bold');
           setIsItalic(selectedElement.fontStyle === 'italic');
+          setIsUnderline(selectedElement.textDecoration === 'underline');
+          setTextAlign(selectedElement.align || 'left');
+          setSelectedColor(selectedElement.fill || selectedColor);
         }
-        setStrokeColor(selectedElement.strokeColor || '#000000');
-        setStrokeWidth(selectedElement.strokeWidth || 0);
-        setEnableShadow(selectedElement.enableShadow || false);
+        // Sync color for non-text elements as well
+        if (selectedElement.type !== 'text') {
+          // Prefer fill, fall back to stroke
+          const col = selectedElement.fill || selectedElement.stroke;
+          if (col) setSelectedColor(col);
+        }
         setShadowColor(selectedElement.shadowColor || '#000000');
         setShadowBlur(selectedElement.shadowBlur || 5);
         setShadowOffsetX(selectedElement.shadowOffsetX || 5);
@@ -183,7 +252,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         setRotation(selectedElement.rotation || 0);
       }
     }
-  }, [selectedId, elements]);
+  }, [selectedId, elements, isEditing, selectedFontSize, selectedColor]);
 
   // Handle clicking outside dropdowns
   useEffect(() => {
@@ -228,8 +297,8 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     const newText = {
       id: Date.now().toString(),
       type: 'text',
-      x: 100,
-      y: 100,
+      x: (stageSize.width / 2) - 50, // Center the text by default
+      y: (stageSize.height / 2) - 10,
       text: 'New Text',
       fontSize: selectedFontSize,
       fontFamily: selectedFontFamily,
@@ -243,10 +312,30 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       scaleX: 1,
       scaleY: 1,
     };
+    
+    // If we're zoomed or panned, adjust the position
+    if (zoom !== 1 || panX !== 0 || panY !== 0) {
+      const stage = stageRef.current;
+      const pointer = stage.getPointerPosition();
+      if (pointer) {
+        const stageBox = stage.container().getBoundingClientRect();
+        const relativeX = (pointer.x - stageBox.left - panX) / zoom;
+        const relativeY = (pointer.y - stageBox.top - panY) / zoom;
+        newText.x = relativeX;
+        newText.y = relativeY;
+      }
+    }
     const newElements = [...elements, newText];
     setElements(newElements);
     saveToHistory(newElements);
     setIsDraft(true);
+    // Immediately enter editing mode for the new text
+    setSelectedId(newText.id);
+    setEditingId(newText.id);
+    setEditText(newText.text);
+    setEditPosition({ x: newText.x, y: newText.y });
+    setEditingElement(newText);
+    setIsEditing(true);
   };
 
   const handleImageUpload = () => {
@@ -687,27 +776,131 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       setIsDraft(true);
     };
 
+    const handleTransformEnd = (e) => {
+      const node = e.target;
+      const scaleX = node.scaleX();
+      const scaleY = node.scaleY();
+      const rotation = node.rotation();
+      
+      // Reset scale on node
+      node.scaleX(1);
+      node.scaleY(1);
+      
+      const updated = elements.map((el) => {
+        if (el.id === element.id) {
+          if (el.type === 'text') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              fontSize: Math.max(8, el.fontSize * scaleY),
+              width: node.width() * scaleX,
+            };
+          } else if (el.type === 'rect') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              width: Math.max(5, el.width * scaleX),
+              height: Math.max(5, el.height * scaleY),
+            };
+          } else if (el.type === 'circle') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              radius: Math.max(5, el.radius * Math.max(scaleX, scaleY)),
+            };
+          } else if (el.type === 'ellipse') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              radiusX: Math.max(5, el.radiusX * scaleX),
+              radiusY: Math.max(5, el.radiusY * scaleY),
+            };
+          } else if (el.type === 'star') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              innerRadius: Math.max(5, el.innerRadius * Math.max(scaleX, scaleY)),
+              outerRadius: Math.max(10, el.outerRadius * Math.max(scaleX, scaleY)),
+            };
+          } else if (el.type === 'image') {
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              width: Math.max(10, el.width * scaleX),
+              height: Math.max(10, el.height * scaleY),
+            };
+          } else {
+            // For triangles, pentagons, hexagons, etc.
+            return {
+              ...el,
+              x: node.x(),
+              y: node.y(),
+              rotation: rotation,
+              radius: el.radius ? Math.max(5, el.radius * Math.max(scaleX, scaleY)) : el.radius,
+              scaleX: el.scaleX !== undefined ? el.scaleX * scaleX : 1,
+              scaleY: el.scaleY !== undefined ? el.scaleY * scaleY : 1,
+            };
+          }
+        }
+        return el;
+      });
+      
+      setElements(updated);
+      saveToHistory(updated);
+      setIsDraft(true);
+    };
+
     const commonProps = {
       key: element.id,
       id: element.id,
       draggable: true,
       onClick: () => setSelectedId(element.id),
       onDragEnd: updatePosition,
+      onTransformEnd: handleTransformEnd,
     };
 
     switch (element.type) {
       case 'text':
+        if (isEditing && editingId === element.id) {
+          return null; // Hide the text when editing
+        }
         return (
           <Text
             {...commonProps}
             {...element}
+            fontFamily={element.fontFamily || 'Arial'}
+            fontSize={element.fontSize || 20}
+            fontWeight={element.fontWeight || 'normal'}
+            fontStyle={element.fontStyle || 'normal'}
+            textDecoration={element.textDecoration || ''}
+            align={element.align || 'left'}
+            width={element.width}
+            onClick={(e) => {
+              e.cancelBubble = true;
+              setSelectedId(element.id);
+            }}
             onDblClick={(e) => {
-              setIsEditing(true);
-              setEditingId(element.id);
-              setEditingElement(element);
-              setEditText(element.text || '');
-              const stageBox = stageRef.current.container().getBoundingClientRect();
-              setEditPosition({ x: stageBox.left + element.x, y: stageBox.top + element.y });
+              e.cancelBubble = true;
+              handleTextDoubleClick(element);
+            }}
+            onDragEnd={(e) => {
+              const updated = elements.map((el) =>
+                el.id === element.id ? { ...el, x: e.target.x(), y: e.target.y() } : el
+              );
+              setElements(updated);
+              saveToHistory(updated);
             }}
           />
         );
@@ -811,16 +1004,19 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     const container = stageRef.current?.container();
     if (!container) return;
     const bounds = container.getBoundingClientRect();
-    const scale = Math.min(bounds.width / stageSize.width, bounds.height / stageSize.height) * 0.9;
+    const scale = Math.min(bounds.width / stageSize.width, bounds.height / stageSize.height);
     setZoom(scale);
-    setPanX((bounds.width - stageSize.width * scale) / 2);
     setPanY((bounds.height - stageSize.height * scale) / 2);
   };
 
-  // Initialize objects from elements
+  // Force re-render when elements change to ensure Konva elements update visually
   useEffect(() => {
-    setObjects(elements);
-  }, [elements]);
+    if (stageRef.current) {
+      stageRef.current.getLayers().forEach(layer => {
+        layer.batchDraw();
+      });
+    }
+  }, [elements, selectedColor, strokeColor, strokeWidth]);
 
   // React to toolbar export requests
   useEffect(() => {
@@ -885,9 +1081,102 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
   };
 
+  // Working text editing functions from your provided code
+  const handleTextDoubleClick = (element) => {
+    setEditingId(element.id);
+    setEditText(element.text);
+    setEditPosition({ x: element.x, y: element.y });
+    setEditingElement(element);
+    setIsEditing(true);
+  };
+
+  const updateText = () => {
+    if (editingId && editText.trim() !== '') {
+      const updated = elements.map((el) =>
+        el.id === editingId ? { ...el, text: editText } : el
+      );
+      setElements(updated);
+      saveToHistory(updated);
+    }
+    setIsEditing(false);
+    setEditingId(null);
+    setEditingElement(null);
+    setEditText('');
+  };
+
+  // Live-update text while typing in overlay
+  const handleTextChange = (e) => {
+    const value = e.target.value;
+    setEditText(value);
+    if (!editingId) return;
+    const updated = elements.map((el) =>
+      el.id === editingId
+        ? {
+            ...el,
+            text: value,
+            // Keep font-related styles in sync while editing
+            fontFamily: editingElement?.fontFamily || selectedFontFamily,
+            fontSize: editingElement?.fontSize || selectedFontSize,
+            fontWeight: editingElement?.fontWeight || (isBold ? 'bold' : 'normal'),
+            fontStyle: editingElement?.fontStyle || (isItalic ? 'italic' : 'normal'),
+            textDecoration: editingElement?.textDecoration || (isUnderline ? 'underline' : ''),
+            align: editingElement?.align || textAlign,
+            fill: editingElement?.fill || selectedColor,
+          }
+        : el
+    );
+    setElements(updated);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      // Commit and exit on Escape
+      updateText();
+    }
+  };
+
+  // Text editor is directly in JSX below - no separate function needed
+  
+  // Centralized color handlers
+  const handleFillColorChange = (value) => {
+    setSelectedColor(value);
+    if (!selectedId) return;
+    
+    const updated = elements.map((el) => {
+      if (el.id !== selectedId) return el;
+      if (el.type === 'text') return { ...el, fill: value };
+      if (el.type === 'arrow' || el.type === 'line') {
+        return { ...el, stroke: value, strokeColor: value, fill: value };
+      }
+      return { ...el, fill: value };
+    });
+    
+    setElements(updated);
+    saveToHistory(updated);
+    setIsDraft(true);
+    
+    if (isEditing && editingId === selectedId) {
+      setEditingElement((prev) => (prev ? { ...prev, fill: value, stroke: value, strokeColor: value } : prev));
+    }
+  };
+
+  const handleStrokeColorChange = (value) => {
+    setStrokeColor(value);
+    if (!selectedId) return;
+    
+    const updated = elements.map((el) =>
+      el.id === selectedId ? { ...el, stroke: value, strokeColor: value } : el
+    );
+    
+    setElements(updated);
+    saveToHistory(updated);
+    setIsDraft(true);
+  };
+
   // ToolPalette component
   const ToolPalette = () => {
     const [openShapes, setOpenShapes] = useState(false);
+    
     return (
       <div className="bg-white border-b border-gray-200 p-2 flex items-center gap-2 relative sticky top-0 z-20">
         <button
@@ -1006,12 +1295,16 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
           <button
             className={`p-2 rounded border ${isBold ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-700 hover:bg-gray-100 border-gray-300'}`}
             onClick={() => {
-              setIsBold(!isBold);
+              const newBold = !isBold;
+              setIsBold(newBold);
               if (selectedId) {
-                const updated = elements.map((el) => el.id === selectedId ? { ...el, fontWeight: !isBold ? 'bold' : 'normal' } : el);
-                setElements(updated);
-                saveToHistory(updated);
-                setIsDraft(true);
+                const selectedElement = elements.find(el => el.id === selectedId);
+                if (selectedElement?.type === 'text') {
+                  const updated = elements.map((el) => el.id === selectedId ? { ...el, fontWeight: newBold ? 'bold' : 'normal' } : el);
+                  setElements(updated);
+                  saveToHistory(updated);
+                  setIsDraft(true);
+                }
               }
             }}
             title="Bold"
@@ -1021,12 +1314,16 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
           <button
             className={`p-2 rounded border ${isItalic ? 'bg-blue-50 text-blue-600 border-blue-200' : 'text-gray-700 hover:bg-gray-100 border-gray-300'}`}
             onClick={() => {
-              setIsItalic(!isItalic);
+              const newItalic = !isItalic;
+              setIsItalic(newItalic);
               if (selectedId) {
-                const updated = elements.map((el) => el.id === selectedId ? { ...el, fontStyle: !isItalic ? 'italic' : 'normal' } : el);
-                setElements(updated);
-                saveToHistory(updated);
-                setIsDraft(true);
+                const selectedElement = elements.find(el => el.id === selectedId);
+                if (selectedElement?.type === 'text') {
+                  const updated = elements.map((el) => el.id === selectedId ? { ...el, fontStyle: newItalic ? 'italic' : 'normal' } : el);
+                  setElements(updated);
+                  saveToHistory(updated);
+                  setIsDraft(true);
+                }
               }
             }}
             title="Italic"
@@ -1038,30 +1335,14 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             type="color"
             className="w-8 h-8 rounded"
             value={selectedColor}
-            onChange={(e) => {
-              setSelectedColor(e.target.value);
-              if (selectedId) {
-                const updated = elements.map((el) => el.id === selectedId ? { ...el, fill: e.target.value } : el);
-                setElements(updated);
-                saveToHistory(updated);
-                setIsDraft(true);
-              }
-            }}
+            onChange={(e) => handleFillColorChange(e.target.value)}
             title="Fill Color"
           />
           <input
             type="color"
             className="w-8 h-8 rounded"
             value={strokeColor}
-            onChange={(e) => {
-              setStrokeColor(e.target.value);
-              if (selectedId) {
-                const updated = elements.map((el) => el.id === selectedId ? { ...el, stroke: e.target.value, strokeColor: e.target.value } : el);
-                setElements(updated);
-                saveToHistory(updated);
-                setIsDraft(true);
-              }
-            }}
+            onChange={(e) => handleStrokeColorChange(e.target.value)}
             title="Stroke Color"
           />
           <input
@@ -1196,8 +1477,154 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
   };
 
+  // Chatbot state and functions
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      id: 1,
+      type: 'bot',
+      text: "Hi! I'm your design assistant. I can help you with creative suggestions for your designs, color combinations, layout ideas, and more!",
+      timestamp: new Date()
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatTyping, setIsChatTyping] = useState(false);
+
+  // Design suggestions for chatbot
+  const designSuggestions = {
+    colors: [
+      "Try using a monochromatic color scheme with different shades of blue for a calming effect",
+      "Consider complementary colors like orange and blue for high contrast and visual appeal",
+      "Use an analogous color scheme (colors next to each other on the color wheel) for harmony",
+      "Try a triadic color scheme - three colors equally spaced on the color wheel for vibrancy"
+    ],
+    layouts: [
+      "Use the rule of thirds to create balanced and visually appealing compositions",
+      "Consider the golden ratio (1.618:1) for naturally pleasing proportions",
+      "Try asymmetrical layouts for dynamic and modern designs",
+      "Use whitespace strategically to guide the viewer's attention"
+    ],
+    typography: [
+      "Pair a serif font for headings with a sans-serif for body text for good readability",
+      "Use font sizes that follow a clear hierarchy - headings should be significantly larger",
+      "Consider line height (1.4-1.6) for optimal reading experience",
+      "Limit your design to 2-3 font families to maintain consistency"
+    ],
+    general: [
+      "Focus on the user's journey and create a clear visual hierarchy",
+      "Use consistent spacing and alignment throughout your design",
+      "Consider accessibility - ensure good contrast ratios for text",
+      "Test your design on different screen sizes for responsive behavior"
+    ]
+  };
+
+  const getRandomSuggestion = (category) => {
+    const suggestions = designSuggestions[category] || designSuggestions.general;
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  };
+
+  const generateChatResponse = (userMessage) => {
+    const message = userMessage.toLowerCase();
+
+    if (message.includes('color') || message.includes('colour')) {
+      return {
+        text: getRandomSuggestion('colors'),
+        suggestions: ['Color Harmony', 'Contrast Tips', 'Brand Colors']
+      };
+    }
+
+    if (message.includes('layout') || message.includes('arrangement') || message.includes('structure')) {
+      return {
+        text: getRandomSuggestion('layouts'),
+        suggestions: ['Grid Systems', 'Visual Hierarchy', 'Responsive Design']
+      };
+    }
+
+    if (message.includes('font') || message.includes('text') || message.includes('typography')) {
+      return {
+        text: getRandomSuggestion('typography'),
+        suggestions: ['Font Pairing', 'Readability', 'Font Sizes']
+      };
+    }
+
+    if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
+      return {
+        text: "Hello! I'm excited to help you with your design project. What specific area would you like suggestions for?",
+        suggestions: ['Color Schemes', 'Layout Ideas', 'Typography', 'General Design Tips']
+      };
+    }
+
+    if (message.includes('thank') || message.includes('thanks')) {
+      return {
+        text: "You're very welcome! I'm here whenever you need more design inspiration. Feel free to ask about anything!",
+        suggestions: ['More Suggestions', 'Specific Elements', 'Design Principles']
+      };
+    }
+
+    const responses = [
+      "That's an interesting design challenge! Here are some thoughts to consider...",
+      "Great question! Let me share some design principles that might help...",
+      "I love exploring creative solutions! Here's what I recommend...",
+      "That's a common design consideration. Here's my perspective..."
+    ];
+
+    return {
+      text: responses[Math.floor(Math.random() * responses.length)] + " " + getRandomSuggestion('general'),
+      suggestions: ['Color Theory', 'Layout Principles', 'Typography Basics', 'Design Trends']
+    };
+  };
+
+  const handleSendChatMessage = () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage = {
+      id: chatMessages.length + 1,
+      type: 'user',
+      text: chatInput,
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatTyping(true);
+
+    setTimeout(() => {
+      const response = generateChatResponse(chatInput);
+      const botMessage = {
+        id: chatMessages.length + 2,
+        type: 'bot',
+        text: response.text,
+        suggestions: response.suggestions,
+        timestamp: new Date()
+      };
+
+      setChatMessages(prev => [...prev, botMessage]);
+      setIsChatTyping(false);
+    }, 1000 + Math.random() * 1000);
+  };
+
+  const handleChatSuggestionClick = (suggestion) => {
+    setChatInput(suggestion);
+  };
+
+  const formatChatTime = (date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Handle clicking outside the text editor
+  const handleRootClick = (e) => {
+    // Only blur if we're clicking outside the text editor
+    const textEditor = e.target.closest('.text-editor-container');
+    if (isEditing && !textEditor) {
+      updateText();
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col bg-white editor-root">
+    <div 
+      className="flex-1 flex flex-col bg-white editor-root" 
+      onClick={handleRootClick}
+    >
       <ToolPalette />
       
       {/* Canvas container */}
@@ -1215,8 +1642,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             onClick={handleStageClick}
             draggable={activeTool === 'pan'}
           >
-            {/* Grid removed */}
-
             {/* Main layer */}
             <Layer>
               {elements.map((element) => (
@@ -1230,46 +1655,212 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         </div>
       </div>
 
-      {/* Text editing overlay */}
-      {isEditing && (
-        <div
-          className="fixed z-50 bg-white border-2 border-blue-500 rounded px-2 py-1"
+      {/* Chatbot Interface */}
+      <div className="fixed bottom-10 right-10 z-40">
+        {/* Chatbot Toggle Button */}
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-12 h-12 rounded-full shadow-lg transition-all duration-300`}
           style={{
-            left: editPosition.x,
-            top: editPosition.y,
-            minWidth: '100px',
+            backgroundColor: isChatOpen ? '#1A3D63' : '#4A7FA7',
           }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = isChatOpen ? '#0A1931' : '#B3CFE5';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = isChatOpen ? '#1A3D63' : '#4A7FA7';
+          }}
+          title={isChatOpen ? 'Close Design Assistant' : 'Open Design Assistant'}
         >
-          <input
-            type="text"
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (editingId && editText.trim() !== '') {
-                  const updated = elements.map((el) =>
-                    el.id === editingId ? { ...el, text: editText } : el
-                  );
-                  setElements(updated);
-                  saveToHistory(updated);
-                }
-                setIsEditing(false);
-                setEditingId(null);
-                setEditText('');
-              } else if (e.key === 'Escape') {
-                setIsEditing(false);
-                setEditingId(null);
-                setEditText('');
-              }
-            }}
-            className="w-full px-1 py-0 border-none outline-none text-sm"
-            style={{
-              fontFamily: editingElement?.fontFamily || 'Arial',
-              fontSize: (editingElement?.fontSize || 16) + 'px',
-            }}
-            autoFocus
+          <img
+            src="/images/logo-m.png"
+            alt="Design Assistant"
+            className="w-8 h-8 mx-auto rounded object-contain"
           />
-        </div>
+        </button>
+
+        {/* Chat Window */}
+        {isChatOpen && (
+          <div className="absolute bottom-16 right-0 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
+            {/* Chat Header */}
+            <div className="p-3" style={{ background: `linear-gradient(to right, #4A7FA7, #1A3D63)`, color: 'white' }}>
+              <div className="flex items-center gap-2">
+                <img src="/images/logo-m.png" alt="AI Assistant" className="w-6 h-6 rounded" />
+                <div>
+                  <h3 className="font-semibold text-sm">Design Assistant</h3>
+                  <p className="text-xs opacity-90">AI-powered design suggestions</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="h-64 overflow-y-auto p-3 space-y-3">
+              {chatMessages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  <div
+                    className={`max-w-xs px-3 py-2 rounded-lg text-sm`}
+                    style={{
+                      backgroundColor: message.type === 'user' ? '#1A3D63' : '#B3CFE5',
+                      color: message.type === 'user' ? 'white' : '#0A1931'
+                    }}
+                  >
+                    <p>{message.text}</p>
+                    {message.suggestions && (
+                      <div className="mt-2 space-y-1">
+                        {message.suggestions.map((suggestion, index) => (
+                          <button
+                            key={index}
+                            onClick={() => handleChatSuggestionClick(suggestion)}
+                            className="block w-full text-left text-xs rounded px-2 py-1 transition-colors"
+                            style={{
+                              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                              color: '#1A3D63'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                            }}
+                          >
+                            ⭐ {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <p className={`text-xs mt-1`}
+                      style={{
+                        color: message.type === 'user' ? '#B3CFE5' : '#4A7FA7'
+                      }}
+                    >
+                      {formatChatTime(message.timestamp)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+
+              {isChatTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 px-3 py-2 rounded-lg max-w-xs">
+                    <div className="flex items-center gap-1">
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Chat Input */}
+            <div className="border-t border-gray-200 p-3">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSendChatMessage()}
+                  placeholder="Ask for design suggestions..."
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none"
+                  style={{
+                    backgroundColor: '#0A1931',
+                    borderColor: '#B3CFE5',
+                    color: 'white'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#4A7FA7';
+                    e.target.style.boxShadow = `0 0 0 2px #B3CFE5`;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#B3CFE5';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                />
+                <button
+                  onClick={handleSendChatMessage}
+                  disabled={!chatInput.trim()}
+                  className="px-3 py-2 rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: chatInput.trim() ? '#1A3D63' : '#B3CFE5',
+                    color: 'white'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (chatInput.trim()) {
+                      e.target.style.backgroundColor = '#0A1931';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (chatInput.trim()) {
+                      e.target.style.backgroundColor = '#1A3D63';
+                    }
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+
+              {/* Quick Suggestions */}
+              <div className="mt-2 flex flex-wrap gap-1">
+                {['Colors', 'Layout', 'Typography', 'Tips'].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleChatSuggestionClick(suggestion.toLowerCase())}
+                    className="px-2 py-1 text-xs rounded transition-colors"
+                    style={{
+                      backgroundColor: '#B3CFE5',
+                      color: '#1A3D63',
+                      border: `1px solid #4A7FA7`
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#4A7FA7';
+                      e.target.style.color = 'white';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#B3CFE5';
+                      e.target.style.color = '#1A3D63';
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      {isEditing && (
+        <textarea
+          value={editText}
+          onChange={handleTextChange}
+          onKeyDown={handleKeyDown}
+          onBlur={updateText}
+          style={{
+            position: 'absolute',
+            top: editPosition.y + 64, // adjust for header
+            left: editPosition.x,
+            fontSize: editingElement?.fontSize || selectedFontSize,
+            fontFamily: editingElement?.fontFamily || selectedFontFamily || 'Arial',
+            fontWeight: editingElement?.fontWeight || (isBold ? 'bold' : 'normal'),
+            fontStyle: editingElement?.fontStyle || (isItalic ? 'italic' : 'normal'),
+            color: editingElement?.fill || selectedColor,
+            background: 'rgba(31, 41, 55, 0.8)', // dark background
+            border: '1px solid rgba(6, 182, 212, 0.5)', // cyan border
+            outline: 'none',
+            resize: 'none',
+            width: editingElement?.width || 200,
+            height: editingElement?.height || 50,
+            lineHeight: 1,
+            borderRadius: '4px',
+            padding: '2px',
+            zIndex: 1000,
+          }}
+          autoFocus
+        />
       )}
       {/* Status bar */}
       <div className="h-8 bg-gray-900 text-gray-200 text-xs px-3 flex items-center gap-4 border-t border-gray-800">

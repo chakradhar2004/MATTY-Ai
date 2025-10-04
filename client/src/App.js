@@ -18,9 +18,10 @@ import EditorPage from './pages/EditorPage';
 import TemplatesPage from './pages/TemplatesPage';
 import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
-import AuthCallbackPage from './pages/AuthCallbackPage';
-import NotFoundPage from './pages/NotFoundPage';
 import AboutPage from './pages/AboutPage';
+import AuthCallbackPage from './pages/AuthCallbackPage';
+import DesignChatPage from './pages/DesignChatPage';
+import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
   const dispatch = useDispatch();
@@ -95,6 +96,16 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <EditorPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/design-chat"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DesignChatPage />
               </Layout>
             </ProtectedRoute>
           }

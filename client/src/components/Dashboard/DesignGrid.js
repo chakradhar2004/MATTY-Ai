@@ -41,7 +41,7 @@ const Dashboard = () => {
 
   const handleEdit = (design) => {
     dispatch(setCurrentDesign(design));
-    navigate('/editor');
+    navigate(`/editor/${design.id}`);
   };
 
   const handleRename = (design) => {

@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Shield
+  Shield,
+  MessageCircle
 } from 'lucide-react';
 import { logout } from '../../store/slices/authSlice';
 import { toggleSidebar } from '../../store/slices/uiSlice';
@@ -37,7 +38,7 @@ const Sidebar = () => {
       name: 'New Design',
       href: '/editor',
       icon: Plus,
-      current: location.pathname === '/editor',
+      current: location.pathname === '/editor' || location.pathname.startsWith('/editor/'),
     },
     {
       name: 'My Designs',
@@ -50,6 +51,12 @@ const Sidebar = () => {
       href: '/templates',
       icon: Image,
       current: location.pathname === '/templates',
+    },
+    {
+      name: 'Design Chat',
+      href: '/design-chat',
+      icon: MessageCircle,
+      current: location.pathname === '/design-chat',
     },
   ];
 
