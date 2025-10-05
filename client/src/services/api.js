@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = 'https://matty-ai-g3c4.onrender.com/api';
 
 // Create axios instance
 const api = axios.create({
