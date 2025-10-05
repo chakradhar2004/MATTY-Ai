@@ -16,22 +16,24 @@ const RegisterForm = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    agreeTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: type === 'checkbox' ? checked : value,
     });
     
     // Clear field-specific error
-    if (errors[e.target.name]) {
+    if (errors[name]) {
       setErrors({
         ...errors,
-        [e.target.name]: '',
+        [name]: '',
       });
     }
   };
@@ -63,6 +65,10 @@ const RegisterForm = () => {
       newErrors.confirmPassword = 'Please confirm your password';
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    if (!formData.agreeTerms) {
+      newErrors.agreeTerms = 'You must agree to the Terms of Service and Privacy Policy';
     }
     
     setErrors(newErrors);
@@ -252,8 +258,10 @@ const RegisterForm = () => {
           <div className="flex items-center">
             <input
               id="agree-terms"
-              name="agree-terms"
+              name="agreeTerms"
               type="checkbox"
+              checked={formData.agreeTerms}
+              onChange={handleChange}
               required
               className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
             />
@@ -268,6 +276,10 @@ const RegisterForm = () => {
               </a>
             </label>
           </div>
+
+          {errors.agreeTerms && (
+            <p className="mt-1 text-sm text-red-600">{errors.agreeTerms}</p>
+          )}
 
           <div>
             <button
