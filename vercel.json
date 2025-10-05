@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "buildCommand": "cd client && npm run build",
   "devCommand": "cd client && npm start",
   "installCommand": "npm run install-all",
