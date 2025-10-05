@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Sparkles,
   Code,
+  Layers,
   Star,
   ArrowRight
 } from 'lucide-react';
