@@ -40,35 +40,27 @@ const RegisterForm = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     if (!formData.username.trim()) {
       newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
     }
-    
+
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
     }
-    
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+
+    if (!formData.password || formData.password.length < 4) {
+      newErrors.password = 'Password must be at least 4 characters';
     }
-    
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
+
+    if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
-    
+
     if (!formData.agreeTerms) {
-      newErrors.agreeTerms = 'You must agree to the Terms of Service';
+      newErrors.agreeTerms = 'You must agree to continue';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
