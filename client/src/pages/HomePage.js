@@ -6,8 +6,7 @@ import {
   Sparkles,
   Code,
   Layers,
-  Star,
-  ArrowRight
+  Star
 } from 'lucide-react';
 
 const HomePage = () => {

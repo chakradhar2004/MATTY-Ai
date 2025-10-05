@@ -140,7 +140,7 @@ export const templateAPI = {
 
 
 // Helper function to convert data URL to Blob
-function dataURLtoBlob(dataURL) {
+export function dataURLtoBlob(dataURL) {
   const arr = dataURL.split(',');
   const mime = arr[0].match(/:(.*?);/)[1];
   const bstr = atob(arr[1]);
