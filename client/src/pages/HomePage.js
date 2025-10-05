@@ -4,7 +4,6 @@ import { useSelector } from 'react-redux';
 import { 
   ChevronRight,
   Sparkles,
-  Layers,
   Code,
   Star,
   ArrowRight
