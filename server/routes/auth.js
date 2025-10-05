@@ -60,8 +60,11 @@ router.post('/register', [
     const user = new User({
       username,
       email,
-      passwordHash: password
+      passwordHash: password  // This should trigger the password virtual setter
     });
+
+    // Set the password through the virtual setter
+    user.password = password;
 
     await user.save();
 
