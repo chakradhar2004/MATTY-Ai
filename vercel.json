@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "framework": "create-react-app",
+  "installCommand": "npm run install-all",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "outputDirectory": "client/build",
+  "regions": ["iad1"]
+}
