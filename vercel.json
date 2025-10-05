@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "framework": "create-react-app",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "@vercel/node"
+    }
+  },
+  "buildCommand": "cd client && npm run build",
+  "devCommand": "cd client && npm start",
   "installCommand": "npm run install-all",
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "outputDirectory": "client/build",
-  "regions": ["iad1"]
+  "outputDirectory": "client/build"
 }
