@@ -1,6 +1,7 @@
 {
   "name": "matty-api-functions",
   "version": "1.0.0",
+  "type": "module",
   "dependencies": {
     "mongoose": "^8.0.3",
     "jsonwebtoken": "^9.0.2",
