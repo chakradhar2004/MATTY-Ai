@@ -287,5 +287,4 @@ For support and questions:
 ---
 
 **Matty AI Design Tool** - Empowering creativity through intelligent design tools.
-#   M A T T Y - A i  
- 
+#
