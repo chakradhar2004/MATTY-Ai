@@ -5,6 +5,41 @@ const auth = require('../middleware/auth');
 
 const router = express.Router();
 
+// @route   GET /api/designs/public/templates
+// @desc    Get public templates
+// @access  Public
+router.get('/public/templates', async (req, res) => {
+  try {
+    const { page = 1, limit = 10, tags } = req.query;
+    
+    const query = { isPublic: true, isTemplate: true };
+    
+    if (tags) {
+      const tagArray = tags.split(',').map(tag => tag.trim());
+      query.tags = { $in: tagArray };
+    }
+    
+    const templates = await Design.find(query)
+      .populate('userId', 'username')
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .select('-jsonData'); // Exclude heavy jsonData for list view
+    
+    const total = await Design.countDocuments(query);
+    
+    res.json({
+      templates,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (error) {
+    console.error('Get templates error:', error);
+    res.status(500).json({ message: 'Server error while fetching templates' });
+  }
+});
+
 // @route   GET /api/designs
 // @desc    Get user's designs
 // @access  Private
@@ -217,40 +252,6 @@ router.delete('/:id', auth, async (req, res) => {
   }
 });
 
-// @route   GET /api/designs/public/templates
-// @desc    Get public templates
-// @access  Public
-router.get('/public/templates', async (req, res) => {
-  try {
-    const { page = 1, limit = 10, tags } = req.query;
-    
-    const query = { isPublic: true, isTemplate: true };
-    
-    if (tags) {
-      const tagArray = tags.split(',').map(tag => tag.trim());
-      query.tags = { $in: tagArray };
-    }
-    
-    const templates = await Design.find(query)
-      .populate('userId', 'username')
-      .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
-      .select('-jsonData'); // Exclude heavy jsonData for list view
-    
-    const total = await Design.countDocuments(query);
-    
-    res.json({
-      templates,
-      totalPages: Math.ceil(total / limit),
-      currentPage: page,
-      total
-    });
-  } catch (error) {
-    console.error('Get templates error:', error);
-    res.status(500).json({ message: 'Server error while fetching templates' });
-  }
-});
 
 // @route   POST /api/designs/:id/duplicate
 // @desc    Duplicate a design
