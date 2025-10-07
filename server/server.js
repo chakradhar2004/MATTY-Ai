@@ -1,4 +1,3 @@
-
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -19,24 +18,25 @@ app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
-
-// Middleware to log all incoming requests for debugging
-app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  console.log('Origin:', req.headers.origin);
-  next();
-});
-
-// A more open CORS policy for debugging
 app.use(cors({
-  origin: (origin, callback) => {
-    // For now, we'll allow all origins to see if we can get a request through.
-    console.log(`CORS check for origin: ${origin}`);
-    callback(null, true);
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://matty-ai.netlify.app',
+      'https://matty-ai-g3c4.onrender.com',
+      'https://matty-aigit-98384117-52961.web.app'
+    ];
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error('Not allowed by CORS'));
+    }
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+  credentials: true
 }));
 
 // Rate limiting
