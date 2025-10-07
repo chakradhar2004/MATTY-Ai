@@ -22,8 +22,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: function() {
       return !this.googleId; // Password not required for Google OAuth users
-    },
-    minlength: [6, 'Password must be at least 6 characters long']
+    }
   },
   googleId: {
     type: String,
@@ -57,31 +56,24 @@ const userSchema = new mongoose.Schema({
 userSchema.virtual('password')
   .set(function(password) {
     this._password = password;
+  })
+  .get(function() {
+    return this._password;
   });
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  // If passwordHash is being set directly (during registration), hash it
-  if (this.passwordHash && this.isModified('passwordHash')) {
-    try {
-      const salt = await bcrypt.genSalt(12);
-      this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-      next();
-    } catch (error) {
-      next(error);
-    }
-  } else if (this._password) {
-    // If virtual password setter was used, hash the _password value
-    try {
-      const salt = await bcrypt.genSalt(12);
-      this.passwordHash = await bcrypt.hash(this._password, salt);
-      this._password = undefined; // Clear the temporary field
-      next();
-    } catch (error) {
-      next(error);
-    }
-  } else {
+// Hash password before validation
+userSchema.pre('validate', async function(next) {
+  if (!this.isModified('password')) {
+    return next();
+  }
+
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.passwordHash = await bcrypt.hash(this._password, salt);
+    this._password = undefined; // Clear the temporary field
     next();
+  } catch (error) {
+    next(error);
   }
 });
 
