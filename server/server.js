@@ -26,7 +26,8 @@ app.use(cors({
     const allowedOrigins = [
       'http://localhost:3000',
       'https://matty-ai.netlify.app',
-      'https://matty-ai-g3c4.onrender.com'
+      'https://matty-ai-g3c4.onrender.com',
+      'https://matty-aigit-98384117-52961.web.app'
     ];
 
     if (allowedOrigins.includes(origin)) {

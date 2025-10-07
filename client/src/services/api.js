@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // For Vercel deployment, use dynamic URL based on environment
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = 'https://matty-ai-backend-noyi.onrender.com/api';
 
 // Create axios instance
 const api = axios.create({
