@@ -56,12 +56,14 @@ router.post('/register', [
       });
     }
 
-    // Create new user and set password
+    // Create new user
     const user = new User({
       username,
-      email,
-      password // This will trigger the virtual setter
+      email
     });
+
+    // Set password separately to ensure virtual setter and pre-save hook are triggered
+    user.password = password;
 
     await user.save();
 

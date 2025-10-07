@@ -21,7 +21,8 @@ const userSchema = new mongoose.Schema({
   passwordHash: {
     type: String,
     required: function() {
-      return !this.googleId; // Password not required for Google OAuth users
+      // Password is not required for users signing up with Google OAuth
+      return !this.googleId;
     }
   },
   googleId: {
@@ -49,40 +50,36 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Index for better query performance
+// Virtual field for password
+userSchema.virtual('password').set(function(password) {
+  // Use a temporary variable to hold the password
+  this._password = password;
+});
 
-
-// Virtual for password (not stored in DB)
-userSchema.virtual('password')
-  .set(function(password) {
-    this._password = password;
-  })
-  .get(function() {
-    return this._password;
-  });
-
-// Hash password before validation
+// Middleware to hash password before validation
 userSchema.pre('validate', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.passwordHash = await bcrypt.hash(this._password, salt);
-    this._password = undefined; // Clear the temporary field
+  // Check if the password virtual field is set.
+  if (this._password) {
+    try {
+      const salt = await bcrypt.genSalt(12);
+      this.passwordHash = await bcrypt.hash(this._password, salt);
+      // Important: clear the temporary password field after hashing
+      this._password = undefined;
+      next();
+    } catch (error) {
+      next(error);
+    }
+  } else {
     next();
-  } catch (error) {
-    next(error);
   }
 });
 
-// Method to compare passwords
+// Method to compare passwords for login
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.passwordHash);
 };
 
-// Method to get public profile
+// Method to return a public user object
 userSchema.methods.getPublicProfile = function() {
   return {
     id: this._id,
