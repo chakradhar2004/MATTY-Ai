@@ -56,14 +56,12 @@ router.post('/register', [
       });
     }
 
-    // Create new user
+    // Create new user and set password
     const user = new User({
       username,
-      email
+      email,
+      password // This will trigger the virtual setter
     });
-
-    // Set the password through the virtual setter (this will trigger hashing)
-    user.password = password;
 
     await user.save();
 
