@@ -6,7 +6,7 @@ import NotificationContainer from '../UI/NotificationContainer';
 
 const Layout = ({ children }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const { sidebarOpen, rightPanelOpen } = useSelector((state) => state.ui);
+  const { sidebarOpen } = useSelector((state) => state.ui);
   const { theme } = useSelector((state) => state.ui);
 
   const toggleSidebar = () => {

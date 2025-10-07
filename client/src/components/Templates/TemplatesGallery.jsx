@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { templateAPI } from '../../services/api';
 import { FaSearch, FaStar, FaPalette, FaArrowRight, FaFilter, FaTimes, FaHeart, FaRegHeart } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 

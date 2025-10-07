@@ -1,15 +1,13 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  Home, 
-  Plus, 
-  FolderOpen, 
-  Image, 
-  Settings, 
+import {
+  Home,
+  Plus,
+  FolderOpen,
+  Image,
   User,
   LogOut,
-  Menu,
   X,
   Shield,
   MessageCircle
@@ -103,11 +101,10 @@ const Sidebar = () => {
             <Link
               key={item.name}
               to={item.href}
-              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                item.current
-                  ? 'bg-primary-100 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-              }`}
+              className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${item.current
+                ? 'bg-primary-100 text-primary-700'
+                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                }`}
             >
               <Icon className="w-5 h-5 mr-3" />
               {item.name}
@@ -141,18 +138,17 @@ const Sidebar = () => {
               <Link
                 key={item.name}
                 to={item.href}
-                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  item.current
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+                className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${item.current
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
               >
                 <Icon className="w-4 h-4 mr-3" />
                 {item.name}
               </Link>
             );
           })}
-          
+
           <button
             onClick={handleLogout}
             className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-700 rounded-md hover:bg-gray-100 hover:text-gray-900 transition-colors"

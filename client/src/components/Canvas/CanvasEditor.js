@@ -1,6 +1,6 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import './CanvasEditor.css';
-import { Stage, Layer, Text, Rect, Circle, RegularPolygon, Image as KonvaImage, Transformer, Line, Arrow, Star, Ellipse, Ring } from 'react-konva';
+import { Stage, Layer, Text, Rect, Circle, RegularPolygon, Image as KonvaImage, Transformer, Line, Arrow, Star, Ellipse } from 'react-konva';
 import { useDispatch, useSelector } from 'react-redux';
 import { saveDesign, updateDesign } from '../../store/slices/designSlice';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { jsPDF } from 'jspdf';
 import useImage from 'use-image';
 import { uploadAPI } from '../../services/api';
 import { setExportRequest } from '../../store/slices/canvasSlice';
-import { FaUndo, FaRedo, FaTrash, FaFont, FaSquare, FaCircle, FaCaretUp, FaImage, FaSave, FaDownload, FaArrowLeft, FaBold, FaItalic, FaFilePdf, FaSpinner, FaMinus, FaArrowRight, FaGem, FaStar, FaPalette, FaPlay, FaStop, FaHeart, FaShapes, FaChevronDown, FaEllipsisH, FaFileImage, FaDraftingCompass, FaChevronUp, FaMousePointer, FaHandPaper } from 'react-icons/fa';
+import { FaUndo, FaRedo, FaTrash, FaFont, FaSquare, FaCircle, FaCaretUp, FaImage, FaSave, FaDownload, FaBold, FaItalic, FaMinus, FaArrowRight, FaStar, FaHeart, FaShapes, FaMousePointer, FaHandPaper } from 'react-icons/fa';
 
 
 // This function is no longer used - text editing is handled by the component's internal methods
@@ -37,7 +37,6 @@ const ImageNode = ({ element, commonProps }) => {
 
 const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   const stageRef = useRef();
-  const fileInputRef = useRef();
   const transformerRef = useRef();
 
   const [elements, setElements] = useState([]);
@@ -56,28 +55,189 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   const [isItalic, setIsItalic] = useState(false);
   const [isUnderline, setIsUnderline] = useState(false);
   const [textAlign, setTextAlign] = useState('left');
-  const [showShapeDropdown, setShowShapeDropdown] = useState(false);
-  const [showTextDropdown, setShowTextDropdown] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const [isDraft, setIsDraft] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [strokeColor, setStrokeColor] = useState('#000000');
   const [strokeWidth, setStrokeWidth] = useState(0);
+  const [clipboard, setClipboard] = useState(null);
   const [shadowColor, setShadowColor] = useState('#000000');
-  const [enableShadow, setEnableShadow] = useState(false);
   const [shadowBlur, setShadowBlur] = useState(5);
   const [shadowOffsetX, setShadowOffsetX] = useState(5);
   const [shadowOffsetY, setShadowOffsetY] = useState(5);
   const [opacity, setOpacity] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [clipboard, setClipboard] = useState(null);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showShapeDropdown, setShowShapeDropdown] = useState(false);
+  const [showTextDropdown, setShowTextDropdown] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      id: 1,
+      type: 'bot',
+      text: "Hi! I'm your design assistant. I can help you with creative suggestions for your designs, color combinations, layout ideas, and more!",
+      timestamp: new Date()
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatTyping, setIsChatTyping] = useState(false);
+
+  // Chatbot color scheme for consistent styling
+  const chatColors = {
+    primary: '#1A3D63',    // Dark blue
+    secondary: '#4A7FA7',  // Medium blue
+    accent: '#B3CFE5',     // Light blue
+    background: '#0A1931', // Dark background
+    text: '#0A1931',       // Dark text
+    border: '#B3CFE5',     // Light border
+    hover: '#0A1931'       // Hover state
+  };
+
+  // Design suggestions for chatbot
+  const designSuggestions = {
+    colors: [
+      "Try using a monochromatic color scheme with different shades of blue for a calming effect",
+      "Consider complementary colors like orange and blue for high contrast and visual appeal",
+      "Use an analogous color scheme (colors next to each other on the color wheel) for harmony",
+      "Try a triadic color scheme - three colors equally spaced on the color wheel for vibrancy"
+    ],
+    layouts: [
+      "Use the rule of thirds to create balanced and visually appealing compositions",
+      "Consider the golden ratio (1.618:1) for naturally pleasing proportions",
+      "Try asymmetrical layouts for dynamic and modern designs",
+      "Use whitespace strategically to guide the viewer's attention"
+    ],
+    typography: [
+      "Pair a serif font for headings with a sans-serif for body text for good readability",
+      "Use font sizes that follow a clear hierarchy - headings should be significantly larger",
+      "Consider line height (1.4-1.6) for optimal reading experience",
+      "Limit your design to 2-3 font families to maintain consistency"
+    ],
+    general: [
+      "Focus on the user's journey and create a clear visual hierarchy",
+      "Use consistent spacing and alignment throughout your design",
+      "Consider accessibility - ensure good contrast ratios for text",
+      "Test your design on different screen sizes for responsive behavior"
+    ]
+  };
+
+  const getRandomSuggestion = (category) => {
+    const suggestions = designSuggestions[category] || designSuggestions.general;
+    return suggestions[Math.floor(Math.random() * suggestions.length)];
+  };
+
+  const generateChatResponse = (userMessage) => {
+    const message = userMessage.toLowerCase();
+
+    if (message.includes('color') || message.includes('colour')) {
+      return {
+        text: getRandomSuggestion('colors'),
+        suggestions: ['Color Harmony', 'Contrast Tips', 'Brand Colors']
+      };
+    }
+
+    if (message.includes('layout') || message.includes('arrangement') || message.includes('structure')) {
+      return {
+        text: getRandomSuggestion('layouts'),
+        suggestions: ['Grid Systems', 'Visual Hierarchy', 'Responsive Design']
+      };
+    }
+
+    if (message.includes('font') || message.includes('text') || message.includes('typography')) {
+      return {
+        text: getRandomSuggestion('typography'),
+        suggestions: ['Font Pairing', 'Readability', 'Font Sizes']
+      };
+    }
+
+    if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
+      return {
+        text: "Hello! I'm excited to help you with your design project. What specific area would you like suggestions for?",
+        suggestions: ['Color Schemes', 'Layout Ideas', 'Typography', 'General Design Tips']
+      };
+    }
+
+    if (message.includes('thank') || message.includes('thanks')) {
+      return {
+        text: "You're very welcome! I'm here whenever you need more design inspiration. Feel free to ask about anything!",
+        suggestions: ['More Suggestions', 'Specific Elements', 'Design Principles']
+      };
+    }
+
+    const responses = [
+      "That's an interesting design challenge! Here are some thoughts to consider...",
+      "Great question! Let me share some design principles that might help...",
+      "I love exploring creative solutions! Here's what I recommend...",
+      "That's a common design consideration. Here's my perspective..."
+    ];
+
+    return {
+      text: responses[Math.floor(Math.random() * responses.length)] + " " + getRandomSuggestion('general'),
+      suggestions: ['Color Theory', 'Layout Principles', 'Typography Basics', 'Design Trends']
+    };
+  };
+
+  const handleSendChatMessage = () => {
+    if (!chatInput.trim()) return;
+
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      text: chatInput,
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatTyping(true);
+
+    setTimeout(() => {
+      try {
+        const response = generateChatResponse(chatInput);
+        const botMessage = {
+          id: Date.now() + 1,
+          type: 'bot',
+          text: response.text,
+          suggestions: response.suggestions,
+          timestamp: new Date()
+        };
+
+        setChatMessages(prev => [...prev, botMessage]);
+      } catch (error) {
+        console.error('Chat response error:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'bot',
+          text: "Sorry, I'm having trouble generating a response right now. Please try again!",
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsChatTyping(false);
+      }
+    }, 1000 + Math.random() * 1000);
+  };
+
+  const handleChatSuggestionClick = (suggestion) => {
+    setChatInput(suggestion);
+  };
+
+  const formatChatTime = (date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Handle clicking outside the text editor
+  const handleRootClick = (e) => {
+    // Only blur if we're clicking outside the text editor
+    const textEditor = e.target.closest('.text-editor-container');
+    if (isEditing && !textEditor) {
+      updateText();
+    }
+  };
 
   // Canvas state
-  const [stageSize, setStageSize] = useState({
+  const [stageSize] = useState({
     width: initialWidth,
     height: initialHeight
   });
@@ -85,8 +245,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const [activeTool, setActiveTool] = useState('select');
-  const [gridSize, setGridSize] = useState(20);
-  const [objects, setObjects] = useState([]);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -96,8 +254,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   const { preferences } = useSelector((state) => state.ui);
   const exportRequest = useSelector((state) => state.canvas.exportRequest);
 
-  const canvasWidth = locationWidth || (currentDesign ? window.innerWidth : 800);
-  const canvasHeight = locationHeight || (currentDesign ? (window.innerHeight - 112) : 600);
 
   // Load design if editing existing one
   useEffect(() => {
@@ -124,6 +280,129 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
   }, [selectedId, elements]);
 
+  const updateText = () => {
+    if (editingId && editText.trim() !== '') {
+      const updated = elements.map((el) =>
+        el.id === editingId ? { ...el, text: editText } : el
+      );
+      setElements(updated);
+      saveToHistory(updated);
+    }
+    setIsEditing(false);
+    setEditingId(null);
+    setEditingElement(null);
+    setEditText('');
+  };
+
+  // Helper function to convert data URL to blob
+  const dataURLtoBlob = (dataURL) => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
+
+  const saveToHistory = (newElements) => {
+    const newHistory = history.slice(0, historyStep + 1);
+    newHistory.push([...newElements]);
+    setHistory(newHistory);
+    setHistoryStep(newHistory.length - 1);
+  };
+
+  const handleUndo = () => {
+    if (historyStep > 0) {
+      setHistoryStep(historyStep - 1);
+      setElements([...history[historyStep - 1]]);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyStep < history.length - 1) {
+      setHistoryStep(historyStep + 1);
+      setElements([...history[historyStep + 1]]);
+    }
+  };
+
+  // Define handleDelete before the useEffect that uses it
+  const handleDelete = () => {
+    if (selectedId) {
+      const newElements = elements.filter((el) => el.id !== selectedId);
+      setElements(newElements);
+      saveToHistory(newElements);
+      setSelectedId(null);
+    }
+  };
+
+  const handleSaveComplete = async () => {
+    const jsonData = { elements };
+    let thumbnailUrl = null;
+
+    // Generate and upload thumbnail
+    if (stageRef.current) {
+      const canvas = stageRef.current.toCanvas();
+      const thumbnailCanvas = document.createElement('canvas');
+      thumbnailCanvas.width = 200;
+      thumbnailCanvas.height = 200;
+      const ctx = thumbnailCanvas.getContext('2d');
+      const scale = Math.min(200 / canvas.width, 200 / canvas.height);
+      const scaledWidth = canvas.width * scale;
+      const scaledHeight = canvas.height * scale;
+      const x = (200 - scaledWidth) / 2;
+      const y = (200 - scaledHeight) / 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 200, 200);
+      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, x, y, scaledWidth, scaledHeight);
+      const thumbnailDataURL = thumbnailCanvas.toDataURL('image/png');
+      const blob = dataURLtoBlob(thumbnailDataURL);
+      try {
+        const formData = new FormData();
+        formData.append('image', blob, 'thumbnail.png');
+        const uploadRes = await uploadAPI.uploadImage(formData);
+        thumbnailUrl = uploadRes.data.url || uploadRes.data.secure_url;
+      } catch (error) {
+        console.error('Thumbnail upload failed', error);
+      }
+    }
+
+    try {
+      if (currentDesign && currentDesign._id) {
+        await dispatch(
+          updateDesign({
+            designId: currentDesign._id,
+            designData: {
+              title: currentDesign.title || 'Untitled Design',
+              jsonData,
+              thumbnailUrl,
+              isDraft: false,
+              canvasWidth: stageSize.width,
+              canvasHeight: stageSize.height,
+            },
+          })
+        ).unwrap();
+      } else {
+        const title = prompt('Enter design title:') || 'Untitled Design';
+        await dispatch(
+          saveDesign({
+            title,
+            jsonData,
+            thumbnailUrl,
+            isDraft: false,
+            canvasWidth: stageSize.width,
+            canvasHeight: stageSize.height,
+          })
+        ).unwrap();
+      }
+      navigate('/dashboard');
+    } catch (error) {
+      alert('Failed to save design');
+    }
+  };
+
   // Keyboard shortcuts: undo/redo/delete/copy/paste/save/export
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -137,7 +416,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       }
 
       const isCtrl = e.ctrlKey || e.metaKey;
-      
+
       // Bold/Italic/Underline shortcuts when text is selected
       if (selectedId) {
         const selectedElement = elements.find(el => el.id === selectedId);
@@ -146,36 +425,33 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             e.preventDefault();
             const newBold = !isBold;
             setIsBold(newBold);
-            const updated = elements.map((el) => 
+            const updated = elements.map((el) =>
               el.id === selectedId ? { ...el, fontWeight: newBold ? 'bold' : 'normal' } : el
             );
             setElements(updated);
             saveToHistory(updated);
-            setIsDraft(true);
             return;
           }
           if (isCtrl && e.key.toLowerCase() === 'i') {
             e.preventDefault();
             const newItalic = !isItalic;
             setIsItalic(newItalic);
-            const updated = elements.map((el) => 
+            const updated = elements.map((el) =>
               el.id === selectedId ? { ...el, fontStyle: newItalic ? 'italic' : 'normal' } : el
             );
             setElements(updated);
             saveToHistory(updated);
-            setIsDraft(true);
             return;
           }
           if (isCtrl && e.key.toLowerCase() === 'u') {
             e.preventDefault();
             const newUnderline = !isUnderline;
             setIsUnderline(newUnderline);
-            const updated = elements.map((el) => 
+            const updated = elements.map((el) =>
               el.id === selectedId ? { ...el, textDecoration: newUnderline ? 'underline' : '' } : el
             );
             setElements(updated);
             saveToHistory(updated);
-            setIsDraft(true);
             return;
           }
         }
@@ -216,13 +492,12 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
           const newElements = [...elements, { ...clipboard, id: Date.now().toString() }];
           setElements(newElements);
           saveToHistory(newElements);
-          setIsDraft(true);
         }
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [elements, selectedId, clipboard, historyStep, history, isEditing]);
+  }, [elements, selectedId, clipboard, historyStep, history, isEditing, isBold, isItalic, isUnderline, handleDelete, handleRedo, handleSaveComplete, handleUndo]);
 
   // Update property controls when selection changes
   useEffect(() => {
@@ -265,33 +540,12 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         setShowSaveMenu(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
-
-  const saveToHistory = (newElements) => {
-    const newHistory = history.slice(0, historyStep + 1);
-    newHistory.push([...newElements]);
-    setHistory(newHistory);
-    setHistoryStep(newHistory.length - 1);
-  };
-
-  const handleUndo = () => {
-    if (historyStep > 0) {
-      setHistoryStep(historyStep - 1);
-      setElements([...history[historyStep - 1]]);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyStep < history.length - 1) {
-      setHistoryStep(historyStep + 1);
-      setElements([...history[historyStep + 1]]);
-    }
-  };
 
   const handleAddText = () => {
     const newText = {
@@ -312,7 +566,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       scaleX: 1,
       scaleY: 1,
     };
-    
+
     // If we're zoomed or panned, adjust the position
     if (zoom !== 1 || panX !== 0 || panY !== 0) {
       const stage = stageRef.current;
@@ -451,25 +705,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     setIsDraft(true);
   };
 
-  const handleAddEllipse = () => {
-    const newEllipse = {
-      id: Date.now().toString(),
-      type: 'ellipse',
-      x: 200,
-      y: 200,
-      radiusX: 80,
-      radiusY: 40,
-      fill: selectedColor,
-      opacity: 1,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-    };
-    const newElements = [...elements, newEllipse];
-    setElements(newElements);
-    saveToHistory(newElements);
-    setIsDraft(true);
-  };
 
   const handleAddStar = () => {
     const newStar = {
@@ -492,45 +727,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     setIsDraft(true);
   };
 
-  const handleAddHexagon = () => {
-    const newHexagon = {
-      id: Date.now().toString(),
-      type: 'hexagon',
-      x: 200,
-      y: 200,
-      sides: 6,
-      radius: 50,
-      fill: selectedColor,
-      opacity: 1,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-    };
-    const newElements = [...elements, newHexagon];
-    setElements(newElements);
-    saveToHistory(newElements);
-    setIsDraft(true);
-  };
 
-  const handleAddPentagon = () => {
-    const newPentagon = {
-      id: Date.now().toString(),
-      type: 'pentagon',
-      x: 200,
-      y: 200,
-      sides: 5,
-      radius: 50,
-      fill: selectedColor,
-      opacity: 1,
-      rotation: 0,
-      scaleX: 1,
-      scaleY: 1,
-    };
-    const newElements = [...elements, newPentagon];
-    setElements(newElements);
-    saveToHistory(newElements);
-    setIsDraft(true);
-  };
 
   const handleAddArrow = () => {
     const newArrow = {
@@ -591,15 +788,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     setIsDraft(true);
   };
 
-  const handleDelete = () => {
-    if (selectedId) {
-      const newElements = elements.filter((el) => el.id !== selectedId);
-      setElements(newElements);
-      saveToHistory(newElements);
-      setSelectedId(null);
-    }
-  };
-
   const handleSaveDraft = async () => {
     const jsonData = { elements };
     try {
@@ -636,84 +824,6 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
   };
 
-  const handleSaveComplete = async () => {
-    const jsonData = { elements };
-    let thumbnailUrl = null;
-
-    // Generate and upload thumbnail
-    if (stageRef.current) {
-      const canvas = stageRef.current.toCanvas();
-      const thumbnailCanvas = document.createElement('canvas');
-      thumbnailCanvas.width = 200;
-      thumbnailCanvas.height = 200;
-      const ctx = thumbnailCanvas.getContext('2d');
-      const scale = Math.min(200 / canvas.width, 200 / canvas.height);
-      const scaledWidth = canvas.width * scale;
-      const scaledHeight = canvas.height * scale;
-      const x = (200 - scaledWidth) / 2;
-      const y = (200 - scaledHeight) / 2;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, 200, 200);
-      ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, x, y, scaledWidth, scaledHeight);
-      const thumbnailDataURL = thumbnailCanvas.toDataURL('image/png');
-      const blob = dataURLtoBlob(thumbnailDataURL);
-      try {
-        const formData = new FormData();
-        formData.append('image', blob, 'thumbnail.png');
-        const uploadRes = await uploadAPI.uploadImage(formData);
-        thumbnailUrl = uploadRes.data.url || uploadRes.data.secure_url;
-      } catch (error) {
-        console.error('Thumbnail upload failed', error);
-      }
-    }
-
-    try {
-      if (currentDesign && currentDesign._id) {
-        await dispatch(
-          updateDesign({
-            designId: currentDesign._id,
-            designData: {
-              title: currentDesign.title || 'Untitled Design',
-              jsonData,
-              thumbnailUrl,
-              isDraft: false,
-              canvasWidth: stageSize.width,
-              canvasHeight: stageSize.height,
-            },
-          })
-        ).unwrap();
-      } else {
-        const title = prompt('Enter design title:') || 'Untitled Design';
-        await dispatch(
-          saveDesign({
-            title,
-            jsonData,
-            thumbnailUrl,
-            isDraft: false,
-            canvasWidth: stageSize.width,
-            canvasHeight: stageSize.height,
-          })
-        ).unwrap();
-      }
-      navigate('/dashboard');
-    } catch (error) {
-      alert('Failed to save design');
-    }
-  };
-
-  // Helper function to convert data URL to blob
-  const dataURLtoBlob = (dataURL) => {
-    const arr = dataURL.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-  };
-
   const handleExportPNG = () => {
     const uri = stageRef.current.toDataURL();
     const link = document.createElement('a');
@@ -722,8 +832,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    // ensure design is saved to dashboard after export
-    handleSaveComplete();
+    // Export only - don't save and close
   };
 
   const handleExportJPG = () => {
@@ -734,7 +843,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    handleSaveComplete();
+    // Export only - don't save and close
   };
 
   const handleExportPDF = () => {
@@ -746,7 +855,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       const pdfHeight = pdf.internal.pageSize.getHeight();
       const imgAspect = canvas.width / canvas.height;
       const pdfAspect = pdfWidth / pdfHeight;
-      
+
       let imgWidth, imgHeight;
       if (imgAspect > pdfAspect) {
         imgWidth = pdfWidth;
@@ -755,14 +864,13 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         imgHeight = pdfHeight;
         imgWidth = pdfHeight * imgAspect;
       }
-      
+
       const x = (pdfWidth - imgWidth) / 2;
       const y = (pdfHeight - imgHeight) / 2;
-      
+
       pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
       pdf.save('design.pdf');
-      // ensure design is saved to dashboard after export
-      handleSaveComplete();
+      // Export only - don't save and close
     }
   };
 
@@ -781,11 +889,11 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       const scaleX = node.scaleX();
       const scaleY = node.scaleY();
       const rotation = node.rotation();
-      
+
       // Reset scale on node
       node.scaleX(1);
       node.scaleY(1);
-      
+
       const updated = elements.map((el) => {
         if (el.id === element.id) {
           if (el.type === 'text') {
@@ -856,7 +964,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         }
         return el;
       });
-      
+
       setElements(updated);
       saveToHistory(updated);
       setIsDraft(true);
@@ -904,24 +1012,24 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             }}
           />
         );
-      
+
       case 'rect':
         return <Rect {...commonProps} {...element} />;
-      
+
       case 'circle':
         return <Circle {...commonProps} {...element} />;
-      
+
       case 'ellipse':
         return <Ellipse {...commonProps} {...element} />;
-      
+
       case 'triangle':
       case 'pentagon':
       case 'hexagon':
         return <RegularPolygon {...commonProps} {...element} />;
-      
+
       case 'star':
         return <Star {...commonProps} {...element} />;
-      
+
       case 'line':
         return (
           <Line
@@ -932,7 +1040,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             opacity={element.opacity}
           />
         );
-      
+
       case 'arrow':
         return (
           <Arrow
@@ -946,10 +1054,10 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             opacity={element.opacity}
           />
         );
-      
+
       case 'image':
         return <ImageNode element={element} commonProps={commonProps} />;
-      
+
       case 'heart':
         // Custom heart shape using path
         return (
@@ -964,7 +1072,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             scaleY={element.scaleY}
           />
         );
-      
+
       default:
         return null;
     }
@@ -977,22 +1085,22 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     const stage = e.target.getStage();
     const oldScale = stage.scaleX();
     const pointer = stage.getPointerPosition();
-    
+
     if (!pointer) return;
-    
+
     const mousePointTo = {
       x: (pointer.x - stage.x()) / oldScale,
       y: (pointer.y - stage.y()) / oldScale
     };
-    
+
     const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
     setZoom(newScale);
-    
+
     const newPos = {
       x: pointer.x - mousePointTo.x * newScale,
       y: pointer.y - mousePointTo.y * newScale
     };
-    
+
     setPanX(newPos.x);
     setPanY(newPos.y);
   };
@@ -1028,7 +1136,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
     // Clear the request
     dispatch(setExportRequest(null));
-  }, [exportRequest]);
+  }, [exportRequest, dispatch, handleExportPDF, handleExportPNG]);
 
   // Listen to toolbar save event
   useEffect(() => {
@@ -1038,7 +1146,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     };
     window.addEventListener('editor:save', onSave);
     return () => window.removeEventListener('editor:save', onSave);
-  }, []);
+  }, [handleSaveComplete]);
 
   // Autosave (draft) on changes
   useEffect(() => {
@@ -1081,7 +1189,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     }
   };
 
-  // Working text editing functions from your provided code
+  // Handle text double-click to enter editing mode
   const handleTextDoubleClick = (element) => {
     setEditingId(element.id);
     setEditText(element.text);
@@ -1090,18 +1198,67 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     setIsEditing(true);
   };
 
-  const updateText = () => {
-    if (editingId && editText.trim() !== '') {
-      const updated = elements.map((el) =>
-        el.id === editingId ? { ...el, text: editText } : el
-      );
-      setElements(updated);
-      saveToHistory(updated);
+  // Handle file drop for image uploads
+  const handleFileDrop = (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        // Handle image drop - trigger the file input click
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.onchange = async (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            setIsUploading(true);
+            try {
+              const formData = new FormData();
+              formData.append('image', file);
+              const response = await uploadAPI.uploadImage(formData);
+              const imageUrl = response.data.imageUrl || response.data.secureUrl || response.data.secure_url || response.data.url;
+
+              // Use a temporary Image to compute dimensions
+              const tempImg = new window.Image();
+              tempImg.crossOrigin = 'anonymous';
+              tempImg.src = imageUrl;
+              tempImg.onload = () => {
+                const maxDim = 300;
+                const scale = Math.min(maxDim / tempImg.width, maxDim / tempImg.height, 1);
+                const newImage = {
+                  id: Date.now().toString(),
+                  type: 'image',
+                  x: 100,
+                  y: 100,
+                  src: imageUrl,
+                  width: Math.round(tempImg.width * scale),
+                  height: Math.round(tempImg.height * scale),
+                  opacity: 1,
+                  rotation: 0,
+                  scaleX: 1,
+                  scaleY: 1,
+                };
+                const newElements = [...elements, newImage];
+                setElements(newElements);
+                saveToHistory(newElements);
+                setIsDraft(true);
+                setIsUploading(false);
+              };
+              tempImg.onerror = () => {
+                alert('Failed to load image');
+                setIsUploading(false);
+              };
+            } catch (error) {
+              console.error('Image upload failed:', error);
+              alert('Image upload failed');
+              setIsUploading(false);
+            }
+          }
+        };
+        fileInput.click();
+      }
     }
-    setIsEditing(false);
-    setEditingId(null);
-    setEditingElement(null);
-    setEditText('');
   };
 
   // Live-update text while typing in overlay
@@ -1112,17 +1269,17 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     const updated = elements.map((el) =>
       el.id === editingId
         ? {
-            ...el,
-            text: value,
-            // Keep font-related styles in sync while editing
-            fontFamily: editingElement?.fontFamily || selectedFontFamily,
-            fontSize: editingElement?.fontSize || selectedFontSize,
-            fontWeight: editingElement?.fontWeight || (isBold ? 'bold' : 'normal'),
-            fontStyle: editingElement?.fontStyle || (isItalic ? 'italic' : 'normal'),
-            textDecoration: editingElement?.textDecoration || (isUnderline ? 'underline' : ''),
-            align: editingElement?.align || textAlign,
-            fill: editingElement?.fill || selectedColor,
-          }
+          ...el,
+          text: value,
+          // Keep font-related styles in sync while editing
+          fontFamily: editingElement?.fontFamily || selectedFontFamily,
+          fontSize: editingElement?.fontSize || selectedFontSize,
+          fontWeight: editingElement?.fontWeight || (isBold ? 'bold' : 'normal'),
+          fontStyle: editingElement?.fontStyle || (isItalic ? 'italic' : 'normal'),
+          textDecoration: editingElement?.textDecoration || (isUnderline ? 'underline' : ''),
+          align: editingElement?.align || textAlign,
+          fill: editingElement?.fill || selectedColor,
+        }
         : el
     );
     setElements(updated);
@@ -1136,12 +1293,12 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   };
 
   // Text editor is directly in JSX below - no separate function needed
-  
+
   // Centralized color handlers
   const handleFillColorChange = (value) => {
     setSelectedColor(value);
     if (!selectedId) return;
-    
+
     const updated = elements.map((el) => {
       if (el.id !== selectedId) return el;
       if (el.type === 'text') return { ...el, fill: value };
@@ -1150,11 +1307,11 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
       }
       return { ...el, fill: value };
     });
-    
+
     setElements(updated);
     saveToHistory(updated);
     setIsDraft(true);
-    
+
     if (isEditing && editingId === selectedId) {
       setEditingElement((prev) => (prev ? { ...prev, fill: value, stroke: value, strokeColor: value } : prev));
     }
@@ -1163,11 +1320,11 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   const handleStrokeColorChange = (value) => {
     setStrokeColor(value);
     if (!selectedId) return;
-    
+
     const updated = elements.map((el) =>
       el.id === selectedId ? { ...el, stroke: value, strokeColor: value } : el
     );
-    
+
     setElements(updated);
     saveToHistory(updated);
     setIsDraft(true);
@@ -1176,7 +1333,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
   // ToolPalette component
   const ToolPalette = () => {
     const [openShapes, setOpenShapes] = useState(false);
-    
+
     return (
       <div className="bg-white border-b border-gray-200 p-2 flex items-center gap-2 relative sticky top-0 z-20">
         <button
@@ -1330,7 +1487,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
           >
             <FaItalic />
           </button>
-          
+
           <input
             type="color"
             className="w-8 h-8 rounded"
@@ -1406,7 +1563,7 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     );
   };
 
-  // GridLayer component
+  // GridLayer component - currently not used but kept for future reference
   const GridLayer = ({ width, height, gridSize }) => {
     const grid = [];
     // Vertical lines
@@ -1434,199 +1591,118 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
     return <Layer>{grid}</Layer>;
   };
 
-  // Handle file drop for quick image add
-  const handleFileDrop = async (e) => {
-    e.preventDefault();
-    const dt = e.dataTransfer;
-    if (!dt || !dt.files || dt.files.length === 0) return;
-    const file = dt.files[0];
-    if (!file.type.startsWith('image/')) return;
-    try {
-      setIsUploading(true);
-      const formData = new FormData();
-      formData.append('image', file);
-      const response = await uploadAPI.uploadImage(formData);
-      const imageUrl = response.data.imageUrl || response.data.secureUrl || response.data.secure_url || response.data.url;
-      const tempImg = new window.Image();
-      tempImg.crossOrigin = 'anonymous';
-      tempImg.src = imageUrl;
-      tempImg.onload = () => {
-        const maxDim = 300;
-        const scale = Math.min(maxDim / tempImg.width, maxDim / tempImg.height, 1);
-        const newImage = {
-          id: Date.now().toString(),
-          type: 'image',
-          x: 100,
-          y: 100,
-          src: imageUrl,
-          width: Math.round(tempImg.width * scale),
-          height: Math.round(tempImg.height * scale),
-          opacity: 1,
-          rotation: 0,
-          scaleX: 1,
-          scaleY: 1,
-        };
-        const newElements = [...elements, newImage];
-        setElements(newElements);
-        saveToHistory(newElements);
-        setIsUploading(false);
-      };
-      tempImg.onerror = () => setIsUploading(false);
-    } catch (err) {
-      setIsUploading(false);
-    }
+  // Chat Message Component
+  const ChatMessage = ({ message, colors, onSuggestionClick, formatTime }) => {
+    console.log('Rendering message:', message); // Debug log
+
+    return (
+      <div className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+        <div
+          className={`max-w-xs px-3 py-2 rounded-lg text-sm`}
+          style={{
+            backgroundColor: message.type === 'user' ? colors.primary : colors.accent,
+            color: message.type === 'user' ? 'white' : colors.text,
+            minHeight: '40px', // Ensure minimum height for visibility
+          }}
+        >
+          <p style={{ margin: 0, padding: '4px 0' }}>{message.text}</p>
+          {message.suggestions && message.suggestions.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {message.suggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  onClick={() => onSuggestionClick(suggestion)}
+                  className="block w-full text-left text-xs rounded px-2 py-1 transition-colors"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: colors.primary,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '11px'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                >
+                  ⭐ {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+          <p className={`text-xs mt-1`}
+            style={{
+              color: message.type === 'user' ? colors.accent : colors.secondary,
+              margin: 0,
+              fontSize: '10px'
+            }}
+          >
+            {formatTime(message.timestamp)}
+          </p>
+        </div>
+      </div>
+    );
   };
 
-  // Chatbot state and functions
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      text: "Hi! I'm your design assistant. I can help you with creative suggestions for your designs, color combinations, layout ideas, and more!",
-      timestamp: new Date()
-    }
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isChatTyping, setIsChatTyping] = useState(false);
-
-  // Design suggestions for chatbot
-  const designSuggestions = {
-    colors: [
-      "Try using a monochromatic color scheme with different shades of blue for a calming effect",
-      "Consider complementary colors like orange and blue for high contrast and visual appeal",
-      "Use an analogous color scheme (colors next to each other on the color wheel) for harmony",
-      "Try a triadic color scheme - three colors equally spaced on the color wheel for vibrancy"
-    ],
-    layouts: [
-      "Use the rule of thirds to create balanced and visually appealing compositions",
-      "Consider the golden ratio (1.618:1) for naturally pleasing proportions",
-      "Try asymmetrical layouts for dynamic and modern designs",
-      "Use whitespace strategically to guide the viewer's attention"
-    ],
-    typography: [
-      "Pair a serif font for headings with a sans-serif for body text for good readability",
-      "Use font sizes that follow a clear hierarchy - headings should be significantly larger",
-      "Consider line height (1.4-1.6) for optimal reading experience",
-      "Limit your design to 2-3 font families to maintain consistency"
-    ],
-    general: [
-      "Focus on the user's journey and create a clear visual hierarchy",
-      "Use consistent spacing and alignment throughout your design",
-      "Consider accessibility - ensure good contrast ratios for text",
-      "Test your design on different screen sizes for responsive behavior"
-    ]
-  };
-
-  const getRandomSuggestion = (category) => {
-    const suggestions = designSuggestions[category] || designSuggestions.general;
-    return suggestions[Math.floor(Math.random() * suggestions.length)];
-  };
-
-  const generateChatResponse = (userMessage) => {
-    const message = userMessage.toLowerCase();
-
-    if (message.includes('color') || message.includes('colour')) {
-      return {
-        text: getRandomSuggestion('colors'),
-        suggestions: ['Color Harmony', 'Contrast Tips', 'Brand Colors']
-      };
-    }
-
-    if (message.includes('layout') || message.includes('arrangement') || message.includes('structure')) {
-      return {
-        text: getRandomSuggestion('layouts'),
-        suggestions: ['Grid Systems', 'Visual Hierarchy', 'Responsive Design']
-      };
-    }
-
-    if (message.includes('font') || message.includes('text') || message.includes('typography')) {
-      return {
-        text: getRandomSuggestion('typography'),
-        suggestions: ['Font Pairing', 'Readability', 'Font Sizes']
-      };
-    }
-
-    if (message.includes('hello') || message.includes('hi') || message.includes('hey')) {
-      return {
-        text: "Hello! I'm excited to help you with your design project. What specific area would you like suggestions for?",
-        suggestions: ['Color Schemes', 'Layout Ideas', 'Typography', 'General Design Tips']
-      };
-    }
-
-    if (message.includes('thank') || message.includes('thanks')) {
-      return {
-        text: "You're very welcome! I'm here whenever you need more design inspiration. Feel free to ask about anything!",
-        suggestions: ['More Suggestions', 'Specific Elements', 'Design Principles']
-      };
-    }
-
-    const responses = [
-      "That's an interesting design challenge! Here are some thoughts to consider...",
-      "Great question! Let me share some design principles that might help...",
-      "I love exploring creative solutions! Here's what I recommend...",
-      "That's a common design consideration. Here's my perspective..."
-    ];
-
-    return {
-      text: responses[Math.floor(Math.random() * responses.length)] + " " + getRandomSuggestion('general'),
-      suggestions: ['Color Theory', 'Layout Principles', 'Typography Basics', 'Design Trends']
-    };
-  };
-
-  const handleSendChatMessage = () => {
-    if (!chatInput.trim()) return;
-
-    const userMessage = {
-      id: chatMessages.length + 1,
-      type: 'user',
-      text: chatInput,
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
-    setChatInput('');
-    setIsChatTyping(true);
-
-    setTimeout(() => {
-      const response = generateChatResponse(chatInput);
-      const botMessage = {
-        id: chatMessages.length + 2,
-        type: 'bot',
-        text: response.text,
-        suggestions: response.suggestions,
-        timestamp: new Date()
-      };
-
-      setChatMessages(prev => [...prev, botMessage]);
-      setIsChatTyping(false);
-    }, 1000 + Math.random() * 1000);
-  };
-
-  const handleChatSuggestionClick = (suggestion) => {
-    setChatInput(suggestion);
-  };
-
-  const formatChatTime = (date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Handle clicking outside the text editor
-  const handleRootClick = (e) => {
-    // Only blur if we're clicking outside the text editor
-    const textEditor = e.target.closest('.text-editor-container');
-    if (isEditing && !textEditor) {
-      updateText();
-    }
+  // Chat Input Component
+  const ChatInput = ({ value, onChange, onSend, colors, placeholder }) => {
+    return (
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && onSend()}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none"
+          style={{
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            color: 'white'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = colors.secondary;
+            e.target.style.boxShadow = `0 0 0 2px ${colors.accent}`;
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = colors.border;
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+        <button
+          onClick={onSend}
+          disabled={!value.trim()}
+          className="px-3 py-2 rounded-lg transition-colors"
+          style={{
+            backgroundColor: value.trim() ? colors.primary : colors.accent,
+            color: 'white'
+          }}
+          onMouseEnter={(e) => {
+            if (value.trim()) {
+              e.target.style.backgroundColor = colors.hover;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (value.trim()) {
+              e.target.style.backgroundColor = colors.primary;
+            }
+          }}
+        >
+          Send
+        </button>
+      </div>
+    );
   };
 
   return (
-    <div 
-      className="flex-1 flex flex-col bg-white editor-root" 
+    <div
+      className="flex-1 flex flex-col bg-white editor-root"
       onClick={handleRootClick}
     >
       <ToolPalette />
-      
+
       {/* Canvas container */}
       <div className="flex-1 flex items-center justify-center p-4" onDragOver={(e) => e.preventDefault()} onDrop={handleFileDrop}>
         <div className="canvas-container shadow-2xl ring-1 ring-black/10 rounded-lg border border-gray-300 bg-white">
@@ -1662,15 +1738,16 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-12 h-12 rounded-full shadow-lg transition-all duration-300`}
           style={{
-            backgroundColor: isChatOpen ? '#1A3D63' : '#4A7FA7',
+            backgroundColor: isChatOpen ? chatColors.primary : chatColors.secondary,
           }}
           onMouseEnter={(e) => {
-            e.target.style.backgroundColor = isChatOpen ? '#0A1931' : '#B3CFE5';
+            e.target.style.backgroundColor = isChatOpen ? chatColors.hover : chatColors.accent;
           }}
           onMouseLeave={(e) => {
-            e.target.style.backgroundColor = isChatOpen ? '#1A3D63' : '#4A7FA7';
+            e.target.style.backgroundColor = isChatOpen ? chatColors.primary : chatColors.secondary;
           }}
           title={isChatOpen ? 'Close Design Assistant' : 'Open Design Assistant'}
+          aria-label={isChatOpen ? 'Close Design Assistant' : 'Open Design Assistant'}
         >
           <img
             src="/images/logo-m.png"
@@ -1683,7 +1760,13 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
         {isChatOpen && (
           <div className="absolute bottom-16 right-0 w-80 bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden">
             {/* Chat Header */}
-            <div className="p-3" style={{ background: `linear-gradient(to right, #4A7FA7, #1A3D63)`, color: 'white' }}>
+            <div
+              className="p-3"
+              style={{
+                background: `linear-gradient(to right, ${chatColors.secondary}, ${chatColors.primary})`,
+                color: 'white'
+              }}
+            >
               <div className="flex items-center gap-2">
                 <img src="/images/logo-m.png" alt="AI Assistant" className="w-6 h-6 rounded" />
                 <div>
@@ -1696,50 +1779,13 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
             {/* Chat Messages */}
             <div className="h-64 overflow-y-auto p-3 space-y-3">
               {chatMessages.map((message) => (
-                <div
+                <ChatMessage
                   key={message.id}
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-xs px-3 py-2 rounded-lg text-sm`}
-                    style={{
-                      backgroundColor: message.type === 'user' ? '#1A3D63' : '#B3CFE5',
-                      color: message.type === 'user' ? 'white' : '#0A1931'
-                    }}
-                  >
-                    <p>{message.text}</p>
-                    {message.suggestions && (
-                      <div className="mt-2 space-y-1">
-                        {message.suggestions.map((suggestion, index) => (
-                          <button
-                            key={index}
-                            onClick={() => handleChatSuggestionClick(suggestion)}
-                            className="block w-full text-left text-xs rounded px-2 py-1 transition-colors"
-                            style={{
-                              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                              color: '#1A3D63'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                            }}
-                          >
-                            ⭐ {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <p className={`text-xs mt-1`}
-                      style={{
-                        color: message.type === 'user' ? '#B3CFE5' : '#4A7FA7'
-                      }}
-                    >
-                      {formatChatTime(message.timestamp)}
-                    </p>
-                  </div>
-                </div>
+                  message={message}
+                  colors={chatColors}
+                  onSuggestionClick={handleChatSuggestionClick}
+                  formatTime={formatChatTime}
+                />
               ))}
 
               {isChatTyping && (
@@ -1748,8 +1794,8 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
                     <div className="flex items-center gap-1">
                       <div className="flex space-x-1">
                         <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </div>
                   </div>
@@ -1759,50 +1805,13 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
 
             {/* Chat Input */}
             <div className="border-t border-gray-200 p-3">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendChatMessage()}
-                  placeholder="Ask for design suggestions..."
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm focus:outline-none"
-                  style={{
-                    backgroundColor: '#0A1931',
-                    borderColor: '#B3CFE5',
-                    color: 'white'
-                  }}
-                  onFocus={(e) => {
-                    e.target.style.borderColor = '#4A7FA7';
-                    e.target.style.boxShadow = `0 0 0 2px #B3CFE5`;
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = '#B3CFE5';
-                    e.target.style.boxShadow = 'none';
-                  }}
-                />
-                <button
-                  onClick={handleSendChatMessage}
-                  disabled={!chatInput.trim()}
-                  className="px-3 py-2 rounded-lg transition-colors"
-                  style={{
-                    backgroundColor: chatInput.trim() ? '#1A3D63' : '#B3CFE5',
-                    color: 'white'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (chatInput.trim()) {
-                      e.target.style.backgroundColor = '#0A1931';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (chatInput.trim()) {
-                      e.target.style.backgroundColor = '#1A3D63';
-                    }
-                  }}
-                >
-                  Send
-                </button>
-              </div>
+              <ChatInput
+                value={chatInput}
+                onChange={setChatInput}
+                onSend={handleSendChatMessage}
+                colors={chatColors}
+                placeholder="Ask for design suggestions..."
+              />
 
               {/* Quick Suggestions */}
               <div className="mt-2 flex flex-wrap gap-1">
@@ -1812,17 +1821,17 @@ const CanvasEditor = ({ initialWidth = 800, initialHeight = 600 }) => {
                     onClick={() => handleChatSuggestionClick(suggestion.toLowerCase())}
                     className="px-2 py-1 text-xs rounded transition-colors"
                     style={{
-                      backgroundColor: '#B3CFE5',
-                      color: '#1A3D63',
-                      border: `1px solid #4A7FA7`
+                      backgroundColor: chatColors.accent,
+                      color: chatColors.primary,
+                      border: `1px solid ${chatColors.secondary}`
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = '#4A7FA7';
+                      e.target.style.backgroundColor = chatColors.secondary;
                       e.target.style.color = 'white';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = '#B3CFE5';
-                      e.target.style.color = '#1A3D63';
+                      e.target.style.backgroundColor = chatColors.accent;
+                      e.target.style.color = chatColors.primary;
                     }}
                   >
                     {suggestion}

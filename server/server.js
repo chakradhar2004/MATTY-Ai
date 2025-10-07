@@ -13,6 +13,9 @@ const uploadRoutes = require('./routes/upload');
 
 const app = express();
 
+// Trust proxy for rate limiting
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors({
@@ -52,14 +55,8 @@ app.use(passport.initialize());
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// MongoDB connection options
-const dbOptions = {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-};
-
 mongoose
-  .connect(MONGODB_URI, dbOptions)
+  .connect(MONGODB_URI)
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => console.error('MongoDB connection error:', err));
 

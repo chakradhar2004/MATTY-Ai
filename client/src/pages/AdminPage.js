@@ -13,8 +13,8 @@ const AdminPage = () => {
   const [loading, setLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [designSearch, setDesignSearch] = useState('');
-  const [userPage, setUserPage] = useState(1);
-  const [designPage, setDesignPage] = useState(1);
+  const [userPage] = useState(1);
+  const [designPage] = useState(1);
 
   useEffect(() => {
     if (activeTab === 'stats') {
@@ -24,7 +24,7 @@ const AdminPage = () => {
     } else if (activeTab === 'designs') {
       fetchDesigns();
     }
-  }, [activeTab, userPage, designPage]);
+  }, [activeTab, userPage, designPage, fetchDesigns, fetchUsers]);
 
   const fetchStats = async () => {
     try {

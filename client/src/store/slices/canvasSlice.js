@@ -316,6 +316,9 @@ const canvasSlice = createSlice({
             const stbObject = state.objects.splice(historyItem.toIndex, 1)[0];
             state.objects.splice(historyItem.fromIndex, 0, stbObject);
             break;
+          default:
+            // Handle unknown history item types
+            break;
         }
         
         state.historyIndex--;
@@ -368,6 +371,9 @@ const canvasSlice = createSlice({
             // Redo the send to back operation
             const stbObject = state.objects.splice(historyItem.fromIndex, 1)[0];
             state.objects.splice(historyItem.toIndex, 0, stbObject);
+            break;
+          default:
+            // Handle unknown history item types
             break;
         }
         

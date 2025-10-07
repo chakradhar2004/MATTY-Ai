@@ -11,8 +11,6 @@ import {
   Edit,
   Trash2,
   Copy,
-  Download,
-  Eye
 } from 'lucide-react';
 import { fetchDesigns, deleteDesign, duplicateDesign } from '../store/slices/designSlice';
 import { setSearchQuery, updateFilters } from '../store/slices/uiSlice';
