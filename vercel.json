@@ -1,11 +1,30 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "server/server.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "build"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "server/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "client/build/$1"
+    }
+  ],
   "env": {
     "CI": "false",
     "DISABLE_ESLINT_PLUGIN": "true"
-  },
-  "buildCommand": "cd client; CI=false npm run build",
-  "devCommand": "cd client;npm start",
-  "installCommand": "npm run install-all",
-  "outputDirectory": "client/build"
+  }
 }
