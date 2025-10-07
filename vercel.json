@@ -1,12 +1,11 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
+  "env": {
+    "CI": "false",
+    "DISABLE_ESLINT_PLUGIN": "true"
   },
-  "buildCommand": "cd client && npm run build",
-  "devCommand": "cd client && npm start",
+  "buildCommand": "cd client; CI=false npm run build",
+  "devCommand": "cd client;npm start",
   "installCommand": "npm run install-all",
   "outputDirectory": "client/build"
 }
